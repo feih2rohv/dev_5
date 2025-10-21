@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>학명/국명 맞추기</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <style>
+    :root { --bg:#0b1020; --card:#141a2f; --text:#e6e9f0; --muted:#9aa3b2; --accent:#8ab4ff; --right:#3ecf8e; --wrong:#ff6b6b; }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#0b1020,#0f1530);font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,Helvetica,Arial,sans-serif;color:var(--text);}
+    .wrap{max-width:880px;margin:40px auto;padding:24px}
+    .card{background:var(--card);border:1px solid #202847;border-radius:16px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    h1{font-size:28px;margin:0 0 8px}
+    .sub{color:var(--muted);margin-bottom:16px}
+    .meta{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 0}
+    .pill{border:1px solid #27304a;border-radius:999px;padding:6px 10px;font-size:13px;background:#121833}
+    .question{font-size:20px;margin:4px 0 12px}
+    .prompt{font-size:24px;font-weight:700;letter-spacing:.2px;word-break:keep-all}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px;margin:18px 0}
+    @media (min-width:640px){.grid{grid-template-columns:1fr 1fr}}
+    .opt{display:flex;align-items:center;gap:10px;border:1px solid #2a3554;background:#0f1631;border-radius:12px;padding:14px 16px;cursor:pointer;transition:transform .06s ease,border-color .2s}
+    .opt:hover{transform:translateY(-1px);border-color:#384774}
+    .opt input{appearance:none;width:18px;height:18px;border:2px solid #51639a;border-radius:50%;display:inline-block;position:relative}
+    .opt[data-selected="true"] input{border-color:var(--accent);}
+    .opt[data-selected="true"] input::after{content:"";position:absolute;inset:3px;background:var(--accent);border-radius:50%}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    button{border:1px solid #2a3554;background:#101739;color:var(--text);padding:12px 16px;border-radius:12px;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .btn-accent{border-color:#3a4f86;background:#13204a}
+    .hint{color:var(--accent);font-weight:700;margin-left:6px}
+    .feedback{margin-top:8px;font-weight:700}
+    .ok{color:var(--right)}
+    .bad{color:#ff6b6b}
+    .footer{margin-top:18px;color:var(--muted);font-size:13px}
+    .hidden{display:none}
+    .progress{height:6px;background:#1a2240;border-radius:10px;overflow:hidden;margin:12px 0}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,#7aa2ff,#53d2f1)}
+    .center{display:flex;align-items:center;justify-content:center;min-height:160px;text-align:center}
+    .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#0e142b;border:1px solid #2a3554;border-radius:8px;padding:2px 6px;font-size:12px}
+    /* Results UI */
+    .badge-ok{color:#0a0;background:transparent;border:1px solid #1f7a1f;border-radius:999px;padding:2px 8px;font-size:12px}
+    .badge-bad{color:#ff6b6b;background:transparent;border:1px solid #7a2b2b;border-radius:999px;padding:2px 8px;font-size:12px}
+    .trow{display:grid;grid-template-columns:56px 1fr 1fr 120px;gap:8px;padding:8px 10px;border-bottom:1px solid #27304a}
+    .trow.head{font-weight:700;background:#101739;position:sticky;top:0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>학명/국명 맞추기</h1>
+      <div class="sub">총 <span id="totalQ">31</span>문항 • 중복 없는 랜덤 출제 • <span class="kbd">힌트</span>는 출제방식에 맞춰 표시</div>
+      <div class="meta">
+        <div class="pill">문항 <span id="qIdx">1</span>/<span id="qTotal">31</span></div>
+        <div class="pill">정답 <span id="score">0</span>개</div>
+        <div class="pill">시간 <span id="timer">00:00</span></div>
+        <div class="pill" id="modePill">출제방식: <span id="modeLabel">학명 → 국명</span></div>
+      </div>
+      <div class="progress"><div class="bar" id="bar"></div></div>
+
+      <div id="quiz">
+        <div class="question" id="qText"></div>
+        <div class="prompt" id="prompt"></div>
+        <div class="grid" id="options"></div>
+        <div class="btns">
+          <button id="hintBtn" class="btn-accent" type="button">힌트 보기</button>
+          <button id="submitBtn" type="button">제출</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+      </div>
+
+      <div id="done" class="hidden center">
+        <div>
+          <h2>완료!</h2>
+          <p>총 <b id="doneTotal">31</b>문항 중 <b id="doneScore">0</b>개 정답</p>
+          <p>소요 시간 <b id="doneTime">00:00</b></p>
+          <div class="btns" style="justify-content:center;margin-top:12px">
+            <button id="restartBtnSoft" class="btn-accent" type="button">빠른 재시작</button>
+            <button id="restartBtnHard" type="button">완전 새로고침</button>
+            <button id="showResultsBtn" type="button">결과 보기</button>
+          </div>
+          <div id="resultsPanel" class="hidden" style="margin-top:16px;text-align:left">
+            <h3 style="margin:8px 0 6px">문항별 결과</h3>
+            <div id="resultsSummary" style="color:#9aa3b2;margin-bottom:8px"></div>
+            <div id="resultsTable" style="max-height:360px;overflow:auto;border:1px solid #27304a;border-radius:10px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">Tip: 옵션을 누른 뒤 <span class="kbd">제출</span>을 눌러 다음 문제로 넘어갑니다. 실수 탭 방지용으로 즉시 채점·이동하지 않습니다.</div>
+    </div>
+  </div>
+
+  <!-- Embedded data -->
+  <script type="application/json" id="phyla-data">
+[
+  {
+    "ko": "해면동물문",
+    "la": "Phylum Porifera"
+  },
+  {
+    "ko": "자포동물문",
+    "la": "Phylum Cnidaria"
+  },
+  {
+    "ko": "유즐동물문",
+    "la": "Phylum Ctenophora"
+  },
+  {
+    "ko": "진무체강형동물문",
+    "la": "Phylum Xenacoelomorpha"
+  },
+  {
+    "ko": "편형동물문",
+    "la": "Phylum Platyhelminthes"
+  },
+  {
+    "ko": "복모동물문",
+    "la": "Phylum Gastrotricha"
+  },
+  {
+    "ko": "악구동물문",
+    "la": "Phylum Gnathostomulida"
+  },
+  {
+    "ko": "미악동물문",
+    "la": "Phylum Micrognathozoa"
+  },
+  {
+    "ko": "윤형동물문",
+    "la": "Phylum Rotifera"
+  },
+  {
+    "ko": "구두동물문",
+    "la": "Phylum Acanthocephala"
+  },
+  {
+    "ko": "중생동물문",
+    "la": "Phylum Mesozoa"
+  },
+  {
+    "ko": "구륜동물문",
+    "la": "Phylum Cycliophora"
+  },
+  {
+    "ko": "내항동물문",
+    "la": "Phylum Entoprocta"
+  },
+  {
+    "ko": "태형동물문",
+    "la": "Phylum Bryozoa"
+  },
+  {
+    "ko": "완족동물문",
+    "la": "Phylum Brachiopoda"
+  },
+  {
+    "ko": "추형동물문",
+    "la": "Phylum Phoronida"
+  },
+  {
+    "ko": "유형동물문",
+    "la": "Phylum Nemertea"
+  },
+  {
+    "ko": "연체동물문",
+    "la": "Phylum Mollusca"
+  },
+  {
+    "ko": "환형동물문",
+    "la": "Phylum Annelida"
+  },
+  {
+    "ko": "선형동물문",
+    "la": "Phylum Nematoda"
+  },
+  {
+    "ko": "유선형동물문",
+    "la": "Phylum Nematomorpha"
+  },
+  {
+    "ko": "동갑동물문",
+    "la": "Phylum Loricifera"
+  },
+  {
+    "ko": "동문동물문",
+    "la": "Phylum Kinorhyncha"
+  },
+  {
+    "ko": "새예동물문",
+    "la": "Phylum Priapulida"
+  },
+  {
+    "ko": "절지동물문",
+    "la": "Phylum Arthropoda"
+  },
+  {
+    "ko": "유조동물문",
+    "la": "Phylum Onychophora"
+  },
+  {
+    "ko": "완보동물문",
+    "la": "Phylum Tardigrada"
+  },
+  {
+    "ko": "모악동물문",
+    "la": "Phylum Chaetognatha"
+  },
+  {
+    "ko": "극피동물문",
+    "la": "Phylum Echinodermata"
+  },
+  {
+    "ko": "반삭동물문",
+    "la": "Phylum Hemichordata"
+  },
+  {
+    "ko": "척삭동물문",
+    "la": "Phylum Chordata"
+  }
+]
+  </script>
+
+  <script>
+    const $ = (s, p=document) => p.querySelector(s);
+    const $$ = (s, p=document) => [...p.querySelectorAll(s)];
+    const shuffle = (arr) => arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+    const mmss = (sec) => {
+      const m = Math.floor(sec/60).toString().padStart(2,'0');
+      const s = (sec%60).toString().padStart(2,'0');
+      return `${m}:${s}`;
+    };
+
+    function loadData(){
+      const el = $('#phyla-data');
+      if(!el) { alert('데이터 태그를 찾을 수 없습니다.'); return []; }
+      const raw = el.textContent.trim();
+      if(!raw){ alert('데이터(JSON)가 비어 있습니다.'); return []; }
+      try { return JSON.parse(raw); }
+      catch(e){ alert('JSON 파싱 오류: ' + e.message); return []; }
+    }
+
+    let DATA = loadData();
+    let items = [];
+    let idx = 0;
+    let score = 0;
+    let seconds = 0; let tHandle = null;
+    let results = []; // per-question logs
+
+    function makeQuestion(entry){
+      const askLatinToKo = Math.random() < 0.5;
+      const correct = askLatinToKo ? entry.ko : entry.la;
+      let pool = askLatinToKo ? DATA.map(x=>x.ko) : DATA.map(x=>x.la);
+      pool = pool.filter(v => v !== correct);
+      const distractors = shuffle(pool).slice(0,3);
+      const options = shuffle([correct, ...distractors]);
+      const qText = askLatinToKo ? '다음 학명의 국명을 고르세요' : '다음 국명의 학명을 고르세요';
+      const prompt = askLatinToKo ? entry.la : entry.ko;
+
+      // Hint: Latin->KO => first char of KO; KO->Latin => first char of second Latin word
+      let hintChar = '';
+      if (askLatinToKo) {
+        hintChar = (entry.ko || '').charAt(0) || '';
+      } else {
+        const parts = (entry.la || '').trim().split(/\s+/);
+        hintChar = (parts.length >= 2 ? parts[1] : parts[0] || '').charAt(0) || '';
+      }
+
+      return { askLatinToKo, qText, prompt, options, correct, hintChar, answer: correct, ko: entry.ko, la: entry.la };
+    }
+
+    function start(){
+      if(!Array.isArray(DATA) || DATA.length !== 31){
+        alert('데이터가 31개가 아닙니다. 현재 개수: ' + (DATA?.length ?? 0));
+        return;
+      }
+      items = shuffle([...DATA]);
+      idx = 0; score = 0; seconds = 0; results = []; updateTimer();
+      if(tHandle) clearInterval(tHandle);
+      tHandle = setInterval(()=>{ seconds++; updateTimer(); },1000);
+      $('#qTotal').textContent = items.length;
+      $('#totalQ').textContent = items.length;
+      next(true);
+    }
+
+    function updateTimer(){ $('#timer').textContent = mmss(seconds); }
+    function setProgress(){ const pct = ((idx)/items.length)*100; $('#bar').style.width = pct + '%'; }
+
+    let current = null; let selected = null; let locked = false;
+
+    function render(){
+      if(!current) return;
+      $('#qIdx').textContent = idx+1;
+      $('#qText').textContent = current.qText;
+      $('#prompt').textContent = current.prompt;
+      $('#feedback').textContent = '';
+      $('#modeLabel').textContent = current.askLatinToKo ? '학명 → 국명' : '국명 → 학명';
+      const optsWrap = $('#options');
+      optsWrap.innerHTML = '';
+      selected = null; locked = false;
+      current.options.forEach((text,i)=>{
+        const lab = document.createElement('label');
+        lab.className = 'opt';
+        lab.setAttribute('data-selected','false');
+        lab.innerHTML = `<input type="radio" name="opt" aria-label="선택 ${i+1}"> <span>${text}</span>`;
+        lab.addEventListener('click',()=>{
+          if(locked) return;
+          selected = text;
+          $$('.opt').forEach(el=>el.setAttribute('data-selected','false'));
+          lab.setAttribute('data-selected','true');
+        });
+        optsWrap.appendChild(lab);
+      });
+      setProgress();
+    }
+
+    function next(first=false){
+      if(idx >= items.length){
+        clearInterval(tHandle);
+        $('#quiz').classList.add('hidden');
+        $('#done').classList.remove('hidden');
+        $('#doneTotal').textContent = items.length;
+        $('#doneScore').textContent = score;
+        $('#doneTime').textContent = mmss(seconds);
+        return;
+      }
+      const entry = items[idx];
+      current = makeQuestion(entry);
+      render();
+      if(!first) window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    $('#hintBtn').addEventListener('click', ()=>{
+      if(!current) return;
+      const hintText = `힌트: "${current.hintChar}"`;
+      const el = document.createElement('span');
+      el.className = 'hint';
+      el.textContent = hintText;
+      const fb = $('#feedback');
+      if(!fb.textContent.includes('힌트')){
+        fb.textContent = '';
+        fb.append(' ', el);
+      }
+    });
+
+    $('#submitBtn').addEventListener('click', ()=>{
+      if(locked) return;
+      if(selected == null){ alert('선지를 선택해 주세요.'); return; }
+      locked = true;
+      const ok = selected === current.answer;
+      if(ok){ score++; $('#score').textContent = score; }
+      // Log
+      results.push({ index: idx+1, direction: current.askLatinToKo ? '학명→국명' : '국명→학명', prompt: current.prompt, selected: selected, answer: current.answer, ko: current.ko, la: current.la, correct: ok });
+      $('#feedback').textContent = ok ? '정답입니다!' : `오답입니다. 정답: ${current.answer}`;
+      idx++;
+      setTimeout(()=>{ next(); }, 700);
+    });
+
+    function resetState(){
+      try { if (tHandle) { clearInterval(tHandle); tHandle = null; } } catch(e) {}
+      idx = 0; score = 0; seconds = 0; results = [];
+      $('#score').textContent = '0';
+      $('#qIdx').textContent = '1';
+      $('#timer').textContent = '00:00';
+      $('#feedback').textContent = '';
+      $('#options').innerHTML = '';
+      $('#bar').style.width = '0%';
+      $('#done').classList.add('hidden');
+      $('#quiz').classList.remove('hidden');
+      window.scrollTo({ top: 0 });
+    }
+    function softRestart(){
+      resetState();
+      items = shuffle([...DATA]);
+      tHandle = setInterval(()=>{ seconds++; updateTimer(); },1000);
+      next(true);
+    }
+    function hardReload(){
+      const base = window.location.href.split('#')[0].split('?')[0];
+      const bust = Date.now();
+      window.location.replace(base + '?t=' + bust);
+    }
+    function renderResults(){
+      const panel = document.getElementById('resultsPanel');
+      const table = document.getElementById('resultsTable');
+      const summary = document.getElementById('resultsSummary');
+      if(!panel || !table) return;
+      panel.classList.remove('hidden');
+      summary.textContent = `정답 ${score}개 / 총 ${items.length}문항`;
+      table.innerHTML = '';
+      const head = document.createElement('div');
+      head.className = 'trow head';
+      head.innerHTML = '<div>#</div><div>문제</div><div>내 선택 / 정답</div><div>방식</div>';
+      table.appendChild(head);
+      results.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'trow';
+        const q = r.direction === '학명→국명' ? r.la : r.ko;
+        const badge = r.correct ? '<span class="badge-ok">정답</span>' : '<span class="badge-bad">오답</span>';
+        row.innerHTML = `
+          <div>${r.index}</div>
+          <div><div style="font-weight:700">${q}</div><div style="color:#9aa3b2">${r.direction}</div></div>
+          <div>${badge} &nbsp; <span>${r.selected}</span> <span style="color:#9aa3b2">/</span> <span>${r.answer}</span></div>
+          <div>${r.direction}</div>
+        `;
+        table.appendChild(row);
+      });
+    }
+
+    document.getElementById('restartBtnSoft').addEventListener('click', softRestart);
+    document.getElementById('restartBtnHard').addEventListener('click', hardReload);
+    document.getElementById('showResultsBtn').addEventListener('click', renderResults);
+
+    // Start
+    start();
+  </script>
+</body>
+</html>
